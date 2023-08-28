@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useEffect, useState } from 'react';
 
 import { getImages } from '../service/API';
 
@@ -10,99 +10,93 @@ import { ImageGallery } from './ImageGallery/ImageGallery';
 import { Loader } from './Loader/Loader';
 import { Button } from './Button/Button';
 
-export class ImageApp extends Component {
-  state = {
-    query: '', // Хранит запрос для поиска
-    images: [], // Хранит загруженные изображения
-    page: 1, // Хранит текущий номер страницы
-    //error: null, // Хранит сообщение об ошибке
-    loading: false, // Индикатор загрузки изображений
-    // totalPages: 0, // Хранит общее количество страниц
-  };
+export const ImageApp = () => {
+  const [query, setQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
 
   //*** */
-  // Метод жизненного цикла: вызывается при обновлении компонента
-  async componentDidUpdate(prevProps, prevState) {
-    const { query, page } = this.state;
-
-    // Проверяем, изменился ли запрос или номер страницы
-    if (prevState.query !== query || prevState.page !== page) {
-      // this.addImages(); // Получаем и добавляем изображения в состояние
-      this.setState({ loading: true });
-      const { hits } = await getImages(query, page);
-
-      this.setState({ loading: false });
-      if (hits.length === 0) {
-        toast.error('Nothing was found for your query');
-        return;
-      }
-      const images = hits.map(({ id, webformatURL, largeImageURL, tags }) => ({
-        id,
-        webformatURL,
-        largeImageURL,
-        tags,
-      }));
-
-      this.setState(prevState => ({
-        images: [...prevState.images, ...images],
-      }));
+  useEffect(() => {
+    if (query === '') {
+      return;
     }
-  }
+    async function getQueryImages() {
+      setLoading(true);
+      try {
+        const { hits } = await getImages(query, page);
+
+        if (hits.length === 0) {
+          toast.error('Nothing was found for your query');
+          return;
+        }
+
+        const images = hits.map(
+          ({ id, webformatURL, largeImageURL, tags }) => ({
+            id,
+            webformatURL,
+            largeImageURL,
+            tags,
+          })
+        );
+
+        setImages(prevImages => [...prevImages, ...images]);
+      } catch (error) {
+        toast.error(`An error occurred: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    getQueryImages();
+  }, [page, query]);
 
   // Метод для обработки отправки формы поиска
 
-  handleSubmit = evt => {
+  const handleSubmit = evt => {
     evt.preventDefault();
     const query = evt.target.elements.query.value;
-    query.trim() === ' '
+    query.trim() === ''
       ? toast.error('Упс... Введите запрос!')
-      : this.changeQuery(query);
+      : changeQuery(query);
 
     evt.target.reset();
   };
 
-  changeQuery = newQuery => {
-    if (newQuery !== this.state.query) {
-      this.setState({
-        query: newQuery,
-        images: [],
-        page: 1,
-      });
+  const changeQuery = newQuery => {
+    if (newQuery !== query) {
+      setQuery(newQuery);
+      setImages([]);
+      setPage(1);
     }
   };
 
   // Метод для загрузки дополнительных изображений путем увеличения номера текущей страницы
-  handleLoadMore = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
+  const handleLoadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  render() {
-    const { images, loading } = this.state;
-
-    return (
-      <div>
-        <SearchBar onSubmit={this.handleSubmit} />
-        {images.length > 0 ? (
-          <ImageGallery images={images} />
-        ) : (
-          <p
-            style={{
-              padding: 100,
-              textAlign: 'center',
-              fontSize: 30,
-            }}
-          >
-            Image gallery is empty...
-          </p>
-        )}
-        {loading && <Loader />}
-        {images.length >= 12 && !loading && (
-          <Button onClick={this.handleLoadMore} /> // Кнопка для загрузки дополнительных изображений
-        )}
-        <ToastContainer />
-      </div>
-    );
-  }
-}
+  return (
+    <div>
+      <SearchBar onSubmit={handleSubmit} />
+      {images.length > 0 ? (
+        <ImageGallery images={images} />
+      ) : (
+        <p
+          style={{
+            padding: 100,
+            textAlign: 'center',
+            fontSize: 30,
+          }}
+        >
+          Image gallery is empty...
+        </p>
+      )}
+      {loading && <Loader />}
+      {images.length >= 12 && !loading && (
+        <Button onClick={handleLoadMore} /> // Кнопка для загрузки дополнительных изображений
+      )}
+      <ToastContainer />
+    </div>
+  );
+};
